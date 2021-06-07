@@ -9,5 +9,6 @@ amazon_review_full_csv
 *.pdf
 *.png
 *.jpg
+*.npy
 
 !stopwords/*
