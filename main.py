@@ -10,19 +10,18 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-# mat1_name = 'mat1.npy'
-# mat2_name = 'mat2.npy'
 sample_path = 'sample'
 
-# mat_size = 31623
-max_len = 31624
+max_len = 31623
 
-def add_mat(mat1, mat2, index, mat_size):
+def add_mat(mat1, mat2, index):
     i = len(mat1)
-    result = np.zeros(shape=(mat_size, mat_size), dtype=np.uint8)
+    j = len(mat1[0])
+    
+    result = np.zeros(shape=(i, j), dtype=np.uint8)
 
     for row in range(i):
-        for col in range(i):
+        for col in range(j):
             result[row][col] = mat1[row][col] + mat2[row][col]
             mat1[row][col] = 0
             mat2[row][col] = 0
@@ -67,6 +66,8 @@ def make_sample():
     step = int(max_len/files)
     amount = step
     for i in range(files):
+        if i == files-1:
+            amount = max_len
         file_name = mat1_name + '/mat-' + str(amount) + '.npy'
         save_mat(amount, file_name)
         file_name = mat2_name + '/mat-' + str(amount) + '.npy'
@@ -95,8 +96,12 @@ def get_args():
 
     return vars(parser.parse_args())
 
-def run_mpi(mat1, mat2):
+def run_mpi(mat1_path, mat2_path):
+    mat_to_share = None
+    
     if rank == 0:
+        mat1 = load_mat(mat1_path)
+        mat2 = load_mat(mat2_path)
         mat_size = len(mat1)
 
         mat_to_share = split_mat(mat1, mat2, mat_size, size)
@@ -109,10 +114,9 @@ def run_mpi(mat1, mat2):
 
     mat_to_share = comm.scatter(mat_to_share, root=0)
 
-    amount = len(mat_to_share[0])
-    result = add_mat(mat_to_share[0], mat_to_share[1], mat_to_share[2], amount)
+    mat_to_share = add_mat(mat_to_share[0], mat_to_share[1], mat_to_share[2])
+    
     del mat_to_share
-    del result
 
 
     # result = comm.gather(result, root=0)
@@ -121,12 +125,14 @@ def run_mpi(mat1, mat2):
     #     for r in result:
     #         print(r)
     
-def run_serial(mat1, mat2):
+def run_serial(mat1_path, mat2_path):
+
+    mat1 = load_mat(mat1_path)
+    mat2 = load_mat(mat2_path)
 
     amount = len(mat1)
-    result = add_mat(mat1, mat2, 0, amount)
-
     print(amount)
+    result = add_mat(mat1, mat2, 0)
 
 def main():
     args = get_args()
@@ -134,13 +140,9 @@ def main():
     if args['make_sample']:
         make_sample()
     elif args['serial']:
-        mat1 = load_mat(args['directory1'])
-        mat2 = load_mat(args['directory2'])
-        run_serial(mat1, mat2)
+        run_serial(args['directory1'], args['directory2'])
     elif args['mpi']:
-        mat1 = load_mat(args['directory1'])
-        mat2 = load_mat(args['directory2'])
-        run_mpi(mat1, mat2)
+        run_mpi(args['directory1'], args['directory2'])
 
 if __name__=='__main__':
     main()
